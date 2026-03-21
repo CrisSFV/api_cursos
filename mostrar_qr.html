@@ -1,0 +1,164 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QR 2FA - API82</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            margin: 0;
+        }
+        .container {
+            background: white;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            max-width: 500px;
+            width: 100%;
+        }
+        h1 {
+            text-align: center;
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .qr-section {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .qr-image {
+            max-width: 100%;
+            border: 2px solid #667eea;
+            padding: 20px;
+            border-radius: 8px;
+            background: #f9f9f9;
+        }
+        .secret-section {
+            background: #f0f4ff;
+            padding: 20px;
+            border-left: 4px solid #667eea;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .secret-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        .secret-value {
+            font-size: 16px;
+            font-family: monospace;
+            color: #333;
+            word-break: break-all;
+            background: white;
+            padding: 10px;
+            border-radius: 5px;
+            user-select: all;
+        }
+        .instructions {
+            background: #fff3cd;
+            border: 1px solid #ffc107;
+            padding: 15px;
+            border-radius: 5px;
+            color: #856404;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+        .instructions ol {
+            margin: 10px 0;
+            padding-left: 20px;
+        }
+        .instructions li {
+            margin: 8px 0;
+        }
+        .copy-btn {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 8px 15px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin-top: 10px;
+            font-size: 12px;
+        }
+        .copy-btn:hover {
+            background: #764ba2;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔐 Configurar 2FA</h1>
+        
+        <div class="qr-section">
+            <h3>Paso 1: Escanea este código QR</h3>
+            <img id="qrImage" class="qr-image" src="" alt="QR Code for 2FA">
+        </div>
+
+        <div class="secret-section">
+            <div class="secret-label">O copia manualmente este código:</div>
+            <div class="secret-value" id="secretValue"></div>
+            <button class="copy-btn" onclick="copiarSecret()">Copiar</button>
+        </div>
+
+        <div class="instructions">
+            <strong>Instrucciones:</strong>
+            <ol>
+                <li>Descarga una app autenticadora: Google Authenticator, Microsoft Authenticator o Authy</li>
+                <li>Abre la app y toca "+" o "Agregar"</li>
+                <li>Selecciona "Escanear código QR" y apunta a la imagen arriba</li>
+                <li>O copia manualmente el código gris si no puedes escanear</li>
+                <li>Recibirás un código de 6 dígitos que cambia cada 30 segundos</li>
+                <li>Copia ese código y confirma la activación de 2FA</li>
+            </ol>
+        </div>
+    </div>
+
+    <script>
+        // Los datos se cargarán desde la API
+        async function cargarQR() {
+            try {
+                const response = await fetch('http://localhost:5000/api/auth/2fa/enable-qr', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ user_id: 2 })
+                });
+                
+                const data = await response.json();
+                
+                // Mostrar QR
+                document.getElementById('qrImage').src = data.qr_image_data_url;
+                
+                // Mostrar secret
+                document.getElementById('secretValue').textContent = data.secret;
+                
+                // Guardar en localStorage para uso posterior
+                localStorage.setItem('2fa_secret', data.secret);
+                localStorage.setItem('2fa_user_id', '2');
+                
+            } catch (error) {
+                console.error('Error al cargar QR:', error);
+                document.body.innerHTML = '<div style="display:flex; justify-content:center; align-items:center; height:100vh; color:white; font-size:20px;">Error: No se pudo conectar con el servidor</div>';
+            }
+        }
+
+        function copiarSecret() {
+            const secret = document.getElementById('secretValue').textContent;
+            navigator.clipboard.writeText(secret).then(() => {
+                alert('¡Código copiado al portapapeles!');
+            });
+        }
+
+        // Cargar QR cuando carga la página
+        cargarQR();
+    </script>
+</body>
+</html>
