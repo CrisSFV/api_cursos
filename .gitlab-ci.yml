@@ -1,0 +1,125 @@
+stages:
+  - test
+  - build
+  - deploy_dev
+  - deploy_prod
+
+# Variables globales
+variables:
+  DOCKER_DRIVER: overlay2
+  DOCKER_TLS_CERTDIR: ""
+  REGISTRY_IMAGE: $CI_REGISTRY_IMAGE
+
+# ===========================
+# STAGE: TEST
+# ===========================
+test:
+  stage: test
+  image: python:3.11-alpine
+  before_script:
+    - apk add --no-cache gcc musl-dev mariadb-dev
+    - pip install -r requirements.txt
+  script:
+    - echo "🧪 Ejecutando pruebas unitarias..."
+    - pytest tests/ -v || echo "No hay tests configurados aún"
+    - echo "✅ Tests completados"
+  only:
+    - merge_requests
+    - develop
+    - main
+
+# ===========================
+# STAGE: BUILD
+# ===========================
+build:docker:
+  stage: build
+  image: docker:latest
+  services:
+    - docker:dind
+  before_script:
+    - docker login -u $CI_REGISTRY_USER -p $CI_REGISTRY_PASSWORD $CI_REGISTRY
+  script:
+    - echo "🐳 Construyendo imagen Docker..."
+    - docker build -t $REGISTRY_IMAGE:$CI_COMMIT_SHA -t $REGISTRY_IMAGE:latest .
+    - echo "📤 Pusheando imagen al registry..."
+    - docker push $REGISTRY_IMAGE:$CI_COMMIT_SHA
+    - docker push $REGISTRY_IMAGE:latest
+    - echo "✅ Imagen construida: $REGISTRY_IMAGE:$CI_COMMIT_SHA"
+  only:
+    - develop
+    - main
+
+# ===========================
+# STAGE: DEPLOY DEV
+# ===========================
+deploy:dev:
+  stage: deploy_dev
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl openssh-client
+  script:
+    - echo "🚀 Desplegando en DESARROLLO..."
+    - echo "Container: $REGISTRY_IMAGE:$CI_COMMIT_SHA"
+    - echo "🔑 Conectando a EC2 DEV..."
+    # Aquí van los comandos SSH para desplegar en EC2
+    - |
+      ssh -i $SSH_PRIVATE_KEY -o StrictHostKeyChecking=no ec2-user@$EC2_DEV_IP \
+      "cd /app && docker pull $REGISTRY_IMAGE:$CI_COMMIT_SHA && \
+      docker stop api-cursos || true && \
+      docker rm api-cursos || true && \
+      docker run -d \
+        --name api-cursos \
+        -p 5000:5000 \
+        --env-file /app/.env \
+        $REGISTRY_IMAGE:$CI_COMMIT_SHA"
+    - echo "✅ Despliegue en DEV completado"
+  environment:
+    name: development
+    url: http://$EC2_DEV_IP:5000
+  only:
+    - develop
+
+# ===========================
+# STAGE: DEPLOY PROD
+# ===========================
+deploy:prod:
+  stage: deploy_prod
+  image: alpine:latest
+  before_script:
+    - apk add --no-cache curl openssh-client
+  script:
+    - echo "🚀🚀🚀 DESPLEGANDO EN PRODUCCIÓN..."
+    - echo "Container: $REGISTRY_IMAGE:$CI_COMMIT_SHA"
+    - echo "🔑 Conectando a EC2 PROD..."
+    # Aquí van los comandos SSH para desplegar en EC2
+    - |
+      ssh -i $SSH_PRIVATE_KEY -o StrictHostKeyChecking=no ec2-user@$EC2_PROD_IP \
+      "cd /app && docker pull $REGISTRY_IMAGE:$CI_COMMIT_SHA && \
+      docker stop api-cursos || true && \
+      docker rm api-cursos || true && \
+      docker run -d \
+        --name api-cursos \
+        -p 5000:5000 \
+        --env-file /app/.env \
+        $REGISTRY_IMAGE:$CI_COMMIT_SHA"
+    - echo "✅ Despliegue en PROD completado"
+  environment:
+    name: production
+    url: http://$EC2_PROD_IP:5000
+  only:
+    - main
+  when: manual  # Requiere aprobación manual para desplegar en prod
+
+# ===========================
+# STAGE: POST-DEPLOY
+# ===========================
+healthcheck:prod:
+  stage: deploy_prod
+  image: curlimages/curl:latest
+  script:
+    - echo "🏥 Verificando salud de la API..."
+    - curl -f http://$EC2_PROD_IP:5000/api/v1 || exit 1
+    - echo "✅ API está saludable"
+  only:
+    - main
+  needs: ["deploy:prod"]

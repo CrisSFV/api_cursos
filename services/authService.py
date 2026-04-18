@@ -97,6 +97,20 @@ class AuthService:
         user.enable_twofa(secret)
         UserRepository.save(user)
         return True
+    
+    @staticmethod
+    def disable_user_2fa(user_id, password):
+        """Deshabilita 2FA para un usuario después de validar la contraseña"""
+        user = UserRepository.find_by_id(user_id)
+        if not user:
+            return False
+        
+        if not user.check_password(password):
+            return False
+        
+        user.disable_twofa()
+        UserRepository.save(user)
+        return True
 
     @staticmethod
     def disable_user_2fa(user_id, password):

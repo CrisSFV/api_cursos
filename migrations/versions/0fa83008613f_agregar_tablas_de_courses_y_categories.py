@@ -1,7 +1,7 @@
 """Agregar tablas de courses y categories
 
 Revision ID: 0fa83008613f
-Revises: 3fa9c5b8d1e2
+Revises: None
 Create Date: 2026-03-21 10:40:33.539089
 
 """
@@ -11,7 +11,7 @@ from sqlalchemy.dialects import mysql
 
 # revision identifiers, used by Alembic.
 revision = '0fa83008613f'
-down_revision = '3fa9c5b8d1e2'
+down_revision = None
 branch_labels = None
 depends_on = None
 
